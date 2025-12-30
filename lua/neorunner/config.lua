@@ -1,5 +1,13 @@
 local M = {}
 
+M.defaults = {
+  term = {
+    size = 12,
+    direction = "horizontal",
+  },
+  keymaps = {},
+}
+
 M.runners = {
   go = {
     run = "go run %",

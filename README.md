@@ -1,19 +1,14 @@
 # NeoRunner
 
-A very simple plugin to solve a simple problem in nvim.
+> A simple, lightweight, and extensible code runner for Neovim.
 
-## Why?
-
-It is reasonable to ask "Why I use this plugin when I can use the ternimal or any other plugin to run/build my code?", and I tell you that this plugin is a solution for a problem I face daily, so I just build it and share it.
-
-You can use the plugin to run/build your code in a split terminal window with a single command. It supports multiple languages out of the box and allows you to easily add or override runners for your specific needs.
+NeoRunner allows you to compile and run code directly from Neovim using a terminal split. It comes with defaults for many popular languages but is fully customizable.
 
 ## Features
 
-- **Run** and **Build** commands for various languages.
-- **Easy configuration**: Add or override runners in your setup.
-- **Terminal integration**: Runs commands in a split terminal window.
-- **Automatic File Expansion**: Replaces `%` with the current absolute file path.
+- **Configurable**: Adding custom runners, terminal size, direction (horizontal/vertical), and keymaps.
+- **Smart Expansion**: `%%` for file path, `%%<` for path without extension.
+- **Auto-Save**: Saves buffer automatically before execution.
 
 ## Installation
 
@@ -21,86 +16,95 @@ You can use the plugin to run/build your code in a split terminal window with a 
 
 ```lua
 {
-  "dir/to/NeoRunner", -- If developing locally
-  -- or if you push to git: "username/NeoRunner"
+  "theawakener0/NeoRunner",
   config = function()
     require("neorunner").setup()
   end
 }
 ```
 
+### [packer.nvim](https://github.com/wbthomason/packer.nvim)
+
+```lua
+use({
+  "theawakener0/NeoRunner",
+  config = function()
+    require("neorunner").setup()
+  end
+})
+```
+
 ## Usage
 
-- `:NeoRun` - Run the current file.
-- `:NeoBuild` - Build the current file.
+| Command | Description |
+|---------|-------------|
+| `:NeoRun` | Run the current file |
+| `:NeoBuild` | Build the current file |
+| `:NeoClose` | Close the terminal buffer |
+| `:NeoTermResize [size]` | Resize terminal (default: 12) |
+
+### Keybindings
+
+```lua
+vim.keymap.set("n", "<leader>r", ":NeoRun<CR>", { desc = "Run Code" })
+vim.keymap.set("n", "<leader>b", ":NeoBuild<CR>", { desc = "Build Code" })
+vim.keymap.set("n", "<leader>c", ":NeoClose<CR>", { desc = "Close Terminal" })
+```
 
 ## Configuration
 
-You can configure existing runners or add new ones in the `setup` function.
-
-### Adding a new language (e.g., Java)
+Pass options to `setup()`:
 
 ```lua
 require("neorunner").setup({
-  runners = {
-    java = {
-      run = "javac % && java %<",
-    }
-  }
+  term = {
+    size = 15,        -- Terminal height/width
+    direction = "horizontal", -- "horizontal" or "vertical"
+  },
+  keymaps = {
+    { "<leader>r", ":NeoRun<CR>", "Run code" },
+    { "<leader>b", ":NeoBuild<CR>", "Build code" },
+    { "<leader>c", ":NeoClose<CR>", "Close terminal" },
+  },
 })
 ```
 
-### Overriding an existing runner
+### Default Runners
+
+| Language | Run Command | Build Command |
+|----------|-------------|---------------|
+| go | `go run %` | `go build %` |
+| python | `python3 %` | - |
+| lua | `lua %` | - |
+| c | `gcc % -o /tmp/a.out && /tmp/a.out` | `gcc % -o %<` |
+| cpp | `g++ % -std=c++20 -O2 -o /tmp/a.out && /tmp/a.out` | `g++ % -std=c++20 -O2 -o %<` |
+| rust | `cargo run` | `cargo build` |
+| javascript | `node %` | - |
+| typescript | `ts-node %` | - |
+
+### Adding Custom Runners
 
 ```lua
 require("neorunner").setup({
-  runners = {
-    python = {
-      run = "python3 -u %", -- Added -u for unbuffered output
-    }
-  }
+  java = {
+    run = "javac % && java %<",
+    build = "javac %",
+  },
+  bash = {
+    run = "bash %",
+  },
 })
 ```
 
-## Default Configuration
+## Placeholders
 
-```lua
-{
-  go = {
-    run = "go run %",
-    build = "go build %",
-  },
-  python = {
-    run = "python3 %",
-  },
-  lua = {
-    run = "lua %",
-  },
-  c = {
-    run = "gcc % -o /tmp/a.out && /tmp/a.out",
-    build = "gcc % -o %<",
-  },
-  cpp = {
-    run = "g++ % -std=c++20 -O2 -o /tmp/a.out && /tmp/a.out",
-    build = "g++ % -std=c++20 -O2 -o %<",
-  },
-  rust = {
-    run = "cargo run",
-    build = "cargo build",
-  },
-  javascript = {
-    run = "node %",
-  },
-  typescript = {
-    run = "ts-node %",
-  },
-}
-```
+- `%%` - Full path to file (`/home/user/project/main.py`)
+- `%%<` - Path without extension (`/home/user/project/main`)
 
 ## Contributing
 
-**Contributions are welcome!**
-Feel free to open issues or submit pull requests for bug fixes, improvements, or new features!
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## License
 
-
+MIT License - see [LICENSE](LICENSE) for details.
