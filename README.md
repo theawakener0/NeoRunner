@@ -6,7 +6,7 @@ NeoRunner allows you to compile and run code directly from Neovim using a termin
 
 ## Features
 
-- **Configurable**: Adding custom runners, terminal size, direction (horizontal/vertical), and keymaps.
+- **Configurable**: Custom runners, terminal size, direction, position, and keymaps.
 - **Smart Expansion**: `%%` for file path, `%%<` for path without extension.
 - **Auto-Save**: Saves buffer automatically before execution.
 
@@ -60,6 +60,7 @@ require("neorunner").setup({
   term = {
     size = 15,        -- Terminal height/width
     direction = "horizontal", -- "horizontal" or "vertical"
+    position = "bottom", -- "top", "bottom", "left", or "right"
   },
   keymaps = {
     { "<leader>r", ":NeoRun<CR>", "Run code" },

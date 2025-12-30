@@ -4,6 +4,6 @@ return {
     "vim",
   },
   ignore = {
-    "212", -- unused argument (opts in setup)
-  },
+    "212",
+    },
 }

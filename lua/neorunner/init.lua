@@ -1,7 +1,7 @@
 local M = {}
 
 local expand_cmd do
-  local ssub, gsub = string.sub, string.gsub
+  local gsub = string.gsub
   local expand = vim.fn.expand
 
   function expand_cmd(cmd)
@@ -12,13 +12,18 @@ end
 
 local function get_term_cmd(cmd)
   local size = M.config.term.size
-  local dir = M.config.term.direction
+  local pos = M.config.term.position
   local expanded = expand_cmd(cmd)
 
-  if dir == "vertical" then
-    return string.format("vsplit | resize %d | terminal %s", size, expanded)
+  if pos == "left" then
+    return string.format("leftabove vsplit | vertical resize %d | terminal %s", size, expanded)
+  elseif pos == "right" then
+    return string.format("rightbelow vsplit | vertical resize %d | terminal %s", size, expanded)
+  elseif pos == "top" then
+    return string.format("topleft split | resize %d | terminal %s", size, expanded)
+  else
+    return string.format("belowright split | resize %d | terminal %s", size, expanded)
   end
-  return string.format("split | resize %d | terminal %s", size, expanded)
 end
 
 local function is_term_buffer(bufnr)
@@ -27,7 +32,10 @@ end
 
 function M.setup(opts)
   local cfg = require("neorunner.config")
-  M.config = vim.tbl_deep_extend("force", cfg.defaults, cfg.runners, opts or {})
+  local defaults = cfg.defaults
+
+  M.config = vim.tbl_deep_extend("force", defaults, opts or {})
+  M.config.runners = vim.tbl_deep_extend("force", cfg.runners, M.config.runners or {})
 
   vim.api.nvim_create_user_command("NeoRun", M.run, {})
   vim.api.nvim_create_user_command("NeoBuild", M.build, {})
@@ -40,7 +48,7 @@ function M.setup(opts)
 end
 
 function M.run()
-  local runner = M.config[vim.bo.filetype]
+  local runner = M.config.runners[vim.bo.filetype]
   if not runner or not runner.run then
     vim.notify(string.format("NeoRunner: No run command for '%s'", vim.bo.filetype), vim.log.levels.WARN)
     return
@@ -51,7 +59,7 @@ function M.run()
 end
 
 function M.build()
-  local runner = M.config[vim.bo.filetype]
+  local runner = M.config.runners[vim.bo.filetype]
   if not runner or not runner.build then
     vim.notify(string.format("NeoRunner: No build command for '%s'", vim.bo.filetype), vim.log.levels.WARN)
     return
@@ -76,8 +84,9 @@ function M.resize_term(size)
 
   local bufnr = vim.api.nvim_get_current_buf()
   if is_term_buffer(bufnr) then
-    if M.config.term.direction == "vertical" then
-      vim.cmd(string.format("resize %d", new_size))
+    local pos = M.config.term.position
+    if pos == "left" or pos == "right" then
+      vim.cmd(string.format("vertical resize %d", new_size))
     else
       vim.cmd(string.format("resize %d", new_size))
     end

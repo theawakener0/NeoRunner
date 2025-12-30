@@ -3,7 +3,7 @@ local M = {}
 M.defaults = {
   term = {
     size = 12,
-    direction = "horizontal",
+    position = "bottom",
   },
   keymaps = {},
 }
