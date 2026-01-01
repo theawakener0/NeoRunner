@@ -1,30 +1,5 @@
 local M = {}
-
-local expand_cmd do
-  local gsub = string.gsub
-  local expand = vim.fn.expand
-
-  function expand_cmd(cmd)
-    local file = expand("%:p")
-    return gsub(gsub(cmd, "%%", file), "%%<", expand("%:p:r"))
-  end
-end
-
-local function get_term_cmd(cmd)
-  local size = M.config.term.size
-  local pos = M.config.term.position
-  local expanded = expand_cmd(cmd)
-
-  if pos == "left" then
-    return string.format("leftabove vsplit | vertical resize %d | terminal %s", size, expanded)
-  elseif pos == "right" then
-    return string.format("rightbelow vsplit | vertical resize %d | terminal %s", size, expanded)
-  elseif pos == "top" then
-    return string.format("topleft split | resize %d | terminal %s", size, expanded)
-  else
-    return string.format("belowright split | resize %d | terminal %s", size, expanded)
-  end
-end
+local project = require("neorunner.project")
 
 local function is_term_buffer(bufnr)
   return vim.bo[bufnr].buftype == "terminal"
@@ -37,10 +12,11 @@ function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", defaults, opts or {})
   M.config.runners = vim.tbl_deep_extend("force", cfg.runners, M.config.runners or {})
 
-  vim.api.nvim_create_user_command("NeoRun", M.run, {})
-  vim.api.nvim_create_user_command("NeoBuild", M.build, {})
+  vim.api.nvim_create_user_command("NeoRun", function() project.execute("run") end, {})
+  vim.api.nvim_create_user_command("NeoBuild", function() project.execute("build") end, {})
   vim.api.nvim_create_user_command("NeoClose", M.close_term, {})
   vim.api.nvim_create_user_command("NeoTermResize", M.resize_term, { nargs = "?" })
+  vim.api.nvim_create_user_command("NeoClearCache", project.clear_cache, {})
 
   for _, mapping in ipairs(M.config.keymaps or {}) do
     vim.keymap.set("n", mapping[1], mapping[2], { desc = mapping[3] or "", silent = true })
@@ -48,25 +24,11 @@ function M.setup(opts)
 end
 
 function M.run()
-  local runner = M.config.runners[vim.bo.filetype]
-  if not runner or not runner.run then
-    vim.notify(string.format("NeoRunner: No run command for '%s'", vim.bo.filetype), vim.log.levels.WARN)
-    return
-  end
-  vim.cmd("write")
-  vim.cmd(get_term_cmd(runner.run))
-  vim.cmd("startinsert")
+  project.execute("run")
 end
 
 function M.build()
-  local runner = M.config.runners[vim.bo.filetype]
-  if not runner or not runner.build then
-    vim.notify(string.format("NeoRunner: No build command for '%s'", vim.bo.filetype), vim.log.levels.WARN)
-    return
-  end
-  vim.cmd("write")
-  vim.cmd(get_term_cmd(runner.build))
-  vim.cmd("startinsert")
+  project.execute("build")
 end
 
 function M.close_term()

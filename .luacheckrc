@@ -4,6 +4,9 @@ return {
     "vim",
   },
   ignore = {
-    "212",
-    },
+    "212", -- unused argument (opts in setup)
+  },
+  exclude_files = {
+    "*.md",
+  },
 }

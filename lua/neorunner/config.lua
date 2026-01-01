@@ -37,6 +37,59 @@ M.runners = {
   typescript = {
     run = "ts-node %",
   },
+  ruby = {
+    run = "ruby %",
+  },
+  java = {
+    run = "java %<",
+    build = "javac %",
+  },
+  kotlin = {
+    run = "kotlinc % -include-runtime -d %<.jar && java -jar %<.jar",
+    build = "kotlinc %",
+  },
+  scala = {
+    run = "scala %",
+    build = "scalac %",
+  },
+  csharp = {
+    run = "dotnet run",
+    build = "dotnet build",
+  },
+  php = {
+    run = "php %",
+  },
+  swift = {
+    run = "swift %",
+    build = "swiftc % -o %<",
+  },
+  haskell = {
+    run = "runhaskell %",
+    build = "ghc -o %< %",
+  },
+  elixir = {
+    run = "elixir %",
+  },
+  dart = {
+    run = "dart %",
+    build = "dart compile exe %",
+  },
+  bash = {
+    run = "bash %",
+  },
+  powershell = {
+    run = "pwsh -File %",
+  },
+  dockerfile = {
+    run = "docker build -t myapp . && docker run -it --rm myapp",
+  },
+  zig = {
+    run = "zig run %",
+    build = "zig build-exe %",
+  },
+  ocaml = {
+    run = "ocaml %",
+  },
 }
 
 return M
