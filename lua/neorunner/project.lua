@@ -1,50 +1,40 @@
 local M = {}
 
--- Cache for detected project root
+-- Cache for detected project root and its config
 local cached_root = nil
+local cached_project_config = nil
+local cached_has_neorunner_file = nil
 
--- Ordered by specificity: .neorunner.lua is most specific, then .git, then language markers.
-local project_markers = {
-  ".neorunner.lua",  -- Project config (highest priority)
-  ".git",            -- Git repository root
-  "go.mod",          -- Go modules
-  "go.work",         -- Go workspace
-  "pom.xml",         -- Maven
-  "Cargo.toml",      -- Rust
-  "package.json",    -- Node.js
-  "package-lock.json", -- Node.js (npm)
-  "yarn.lock",       -- Node.js (yarn)
-  "pnpm-lock.yaml",  -- Node.js (pnpm)
-  "bun.lockb",       -- Bun
-  "deno.json",       -- Deno
-  "deno.jsonc",      -- Deno
-  "pyproject.toml",  -- Python (Poetry/setuptools)
-  "requirements.txt", -- Python (pip)
-  "setup.py",        -- Python (setuptools)
-  "setup.cfg",       -- Python (setuptools)
-  "Pipfile",         -- Python (pipenv)
-  "Makefile",        -- C/C++
-  "CMakeLists.txt",  -- C/C++
-  "meson.build",     -- Meson build system
-  "build.gradle",    -- Gradle (Java/Kotlin)
-  "build.gradle.kts", -- Gradle Kotlin DSL
-  "settings.gradle", -- Gradle
-  "gradlew",         -- Gradle wrapper
-  "build.sbt",       -- Scala (sbt)
-  "stack.yaml",      -- Haskell (Stack)
-  "cabal.project",   -- Haskell (Cabal)
-  "mix.exs",         -- Elixir (Mix)
-  "pubspec.yaml",    -- Dart/Flutter
-  "composer.json",   -- PHP (Composer)
-  "Gemfile",         -- Ruby (Bundler)
-  ".csproj",         -- C# project
-  ".sln",            -- .NET solution
-  "zig.mod",         -- Zig
-  "build.zig",       -- Zig
-  "vcpkg.json",      -- C/C++ (vcpkg)
-  "conanfile.txt",   -- C/C++ (Conan)
-  "conanfile.py",    -- C/C++ (Conan)
+-- Fast-path: cache the language defaults at module load
+local language_defaults = require("neorunner.config").runners
+
+local priority_markers = {
+  ".neorunner.lua",
+  ".git",
 }
+
+-- Fallback markers
+local marker_groups = {
+  { "go.mod", "go.work" },                           -- Go
+  { "Cargo.toml", "Cargo.lock" },                    -- Rust
+  { "package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb" }, -- Node.js
+  { "deno.json", "deno.jsonc" },                     -- Deno
+  { "pyproject.toml", "requirements.txt", "setup.py", "setup.cfg", "Pipfile", "pyrightconfig.json" }, -- Python
+  { "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "gradlew" }, -- Java/Kotlin
+  { "Makefile", "CMakeLists.txt", "meson.build", "build.zig", "vcpkg.json", "conanfile.txt", "conanfile.py" }, -- C/C++
+  { "build.sbt" },                                   -- Scala
+  { "stack.yaml", "cabal.project" },                 -- Haskell
+  { "mix.exs" },                                     -- Elixir
+  { "pubspec.yaml" },                                -- Dart/Flutter
+  { "composer.json" },                               -- PHP
+  { "Gemfile" },                                     -- Ruby
+  { ".csproj", ".sln" },                             -- .NET
+  { "zig.mod" },                                     -- Zig
+}
+
+local function has_project_file(dir, filename)
+  return vim.fn.filereadable(dir .. filename) == 1 or vim.fn.isdirectory(dir .. filename) == 1
+end
 
 local function find_project_root(path)
   if cached_root then
@@ -61,74 +51,90 @@ local function find_project_root(path)
   local home = vim.fn.expand("~")
 
   for _ = 1, max_depth do
-    -- Stop at filesystem root or home
     if current == "/" or current == "" or current == home then
       break
     end
 
-    -- Check if this directory contains any project marker
-    for _, marker in ipairs(project_markers) do
-      local marker_path = current .. marker
-      if vim.fn.filereadable(marker_path) == 1 or vim.fn.isdirectory(marker_path) == 1 then
+    -- Check priority markers first 
+    for _, marker in ipairs(priority_markers) do
+      if has_project_file(current, marker) then
         cached_root = current
         return cached_root
       end
     end
 
-    -- Move to parent directory
+    -- Check grouped markers
+    for _, group in ipairs(marker_groups) do
+      for _, marker in ipairs(group) do
+        if has_project_file(current, marker) then
+          cached_root = current
+          return cached_root
+        end
+      end
+    end
+
     current = vim.fn.fnamemodify(current, ":h")
   end
 
   return nil
 end
 
---- Load .neorunner.lua from project root safely.
 local function load_project_config(root)
   local config_path = root .. ".neorunner.lua"
 
-  if vim.fn.filereadable(config_path) ~= 1 then
+  -- Fast-path: if we know there's no .neorunner.lua, skip the file check
+  if cached_has_neorunner_file == false then
     return nil
   end
 
+  if vim.fn.filereadable(config_path) ~= 1 then
+    cached_has_neorunner_file = false
+    return nil
+  end
+
+  -- Cache the config result
   local ok, config = pcall(dofile, config_path)
 
   if not ok then
-    vim.notify(
-      string.format("NeoRunner: Error loading .neorunner.lua: %s", config),
-      vim.log.levels.ERROR
-    )
+    vim.notify(string.format("NeoRunner: Error loading .neorunner.lua: %s", config), vim.log.levels.ERROR)
+    cached_has_neorunner_file = false
     return nil
   end
 
   if type(config) ~= "table" then
-    vim.notify(
-      "NeoRunner: .neorunner.lua must return a table",
-      vim.log.levels.WARN
-    )
+    vim.notify("NeoRunner: .neorunner.lua must return a table", vim.log.levels.WARN)
+    cached_has_neorunner_file = false
     return nil
   end
 
+  cached_has_neorunner_file = true
+  cached_project_config = config
   return config
 end
 
---- Resolve command for a given filetype using project config and language defaults.
 local function resolve_command(filetype, command_type)
   local root = find_project_root()
-  local project_config = root and load_project_config(root)
-  local language_defaults = require("neorunner.config").runners
+
+  -- Load project config if root found
+  if root and not cached_project_config then
+    load_project_config(root)
+  end
 
   -- Priority 1: Project config, language-specific
-  if project_config and type(project_config[filetype]) == "table" then
-    local cmd = project_config[filetype][command_type]
-    if cmd and type(cmd) == "string" and cmd ~= "" then
-      return cmd
+  if cached_project_config then
+    local lang_config = cached_project_config[filetype]
+    if type(lang_config) == "table" then
+      local cmd = lang_config[command_type]
+      if type(cmd) == "string" and cmd ~= "" then
+        return cmd
+      end
     end
   end
 
   -- Priority 2: Project config, global
-  if project_config then
-    local cmd = project_config[command_type]
-    if cmd and type(cmd) == "string" and cmd ~= "" then
+  if cached_project_config then
+    local cmd = cached_project_config[command_type]
+    if type(cmd) == "string" and cmd ~= "" then
       return cmd
     end
   end
@@ -139,11 +145,17 @@ local function resolve_command(filetype, command_type)
     return lang_runner[command_type]
   end
 
-  -- Priority 4: Not found - return nil
   return nil
 end
 
---- Execute a command in the terminal.
+local function expand_placeholders(cmd)
+  local file_path = vim.fn.expand("%:p")
+  local file_no_ext = vim.fn.expand("%:p:r")
+
+  -- Single-pass replacement for better performance
+  return (cmd:gsub("%%", "'" .. file_path .. "'"):gsub("%%<", "'" .. file_no_ext .. "'"))
+end
+
 function M.execute(command_type)
   local filetype = vim.bo.filetype
 
@@ -156,11 +168,7 @@ function M.execute(command_type)
 
   if not cmd then
     vim.notify(
-      string.format(
-        "NeoRunner: No %s command found for '%s' (project or language default)",
-        command_type,
-        filetype
-      ),
+      string.format("NeoRunner: No %s command for '%s'", command_type, filetype),
       vim.log.levels.WARN
     )
     return
@@ -168,9 +176,7 @@ function M.execute(command_type)
 
   vim.cmd("write")
 
-  local expanded = cmd
-    :gsub("%%", vim.fn.expand("%:p"))
-    :gsub("%%<", vim.fn.expand("%:p:r"))
+  local expanded = expand_placeholders(cmd)
 
   local size = M.config and M.config.term.size or 12
   local pos = M.config and M.config.term.position or "bottom"
@@ -190,9 +196,10 @@ function M.execute(command_type)
   vim.cmd("startinsert")
 end
 
---- Invalidate cached project root (for testing or manual refresh).
 function M.clear_cache()
   cached_root = nil
+  cached_project_config = nil
+  cached_has_neorunner_file = nil
 end
 
 return M

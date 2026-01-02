@@ -7,6 +7,7 @@ NeoRunner allows you to compile and run code directly from Neovim using a termin
 ## Features
 
 - **Per-Project Config**: Define run/build commands per-project with `.neorunner.lua`.
+- **Fast**: Cached project detection, lazy-loaded configs, optimized string operations.
 - **Configurable**: Custom runners, terminal size, position, and keymaps.
 - **Smart Expansion**: `%%` for file path, `%%<` for path without extension.
 - **Auto-Save**: Saves buffer automatically before execution.
@@ -125,32 +126,35 @@ return {
 
 ### Project Root Detection
 
-NeoRunner searches upward from the current buffer for:
-1. `.neorunner.lua` (highest priority)
-2. `.git`
-3. Common project markers: `go.mod`, `Cargo.toml`, `pom.xml`, `package.json`, etc.
+NeoRunner searches upward from the current buffer for project markers. Detection is cached per session for performance.
 
-The detected root is cached for the session. Use `:NeoClearCache` to refresh.
+**Search order:**
+1. `.neorunner.lua` (project config)
+2. `.git` (git repository)
+3. Language-specific markers: `go.mod`, `Cargo.toml`, `pom.xml`, `package.json`, etc.
 
-### Example Project Structure
+**Supported markers:**
+- **Go**: `go.mod`, `go.work`
+- **Rust**: `Cargo.toml`, `Cargo.lock`
+- **Node.js**: `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lockb`
+- **Deno**: `deno.json`, `deno.jsonc`
+- **Python**: `pyproject.toml`, `requirements.txt`, `setup.py`, `setup.cfg`, `Pipfile`
+- **Java/Kotlin**: `pom.xml`, `build.gradle`, `build.gradle.kts`, `settings.gradle`, `gradlew`
+- **C/C++**: `Makefile`, `CMakeLists.txt`, `meson.build`, `build.zig`, `vcpkg.json`, `conanfile.txt`, `conanfile.py`
+- **Scala**: `build.sbt`
+- **Haskell**: `stack.yaml`, `cabal.project`
+- **Elixir**: `mix.exs`
+- **Dart/Flutter**: `pubspec.yaml`
+- **PHP**: `composer.json`
+- **Ruby**: `Gemfile`
+- **.NET**: `.csproj`, `.sln`
+- **Zig**: `zig.mod`
 
-```
-my-java-app/
-├── .neorunner.lua       -- Project-specific commands
-├── pom.xml
-└── src/main/java/
-    └── Main.java
-```
-
-```lua
--- .neorunner.lua
-return {
-  java = {
-    build = "mvn clean package",
-    run = "java -jar target/my-app.jar"
-  }
-}
-```
+**Cache Management:**
+The project root is cached after the first detection. Use `:NeoClearCache` to refresh when you:
+- Open a file in a different project
+- Create a new `.neorunner.lua` file
+- Move files between projects
 
 ## Default Runners
 
@@ -184,6 +188,7 @@ return {
 
 - `%%` - Full path to file (`/home/user/project/main.py`)
 - `%%<` - Path without extension (`/home/user/project/main`)
+- Paths are automatically quoted to handle spaces safely.
 
 ## Contributing
 
